@@ -46,6 +46,8 @@ Options for build action:
     --api=level                 minimum Android API level. default=23
     --build-dir=path            path to the build output dir. default=./build
     --icu-src-dir=path          path to the ICU4C source dir. default=./icu/icu4c
+    --install-include-dir=path  path to the output dir for the include files. default=./build/install/include
+    --install-libs-dir=path     path to the output dir for the library (and data) files. default=./build/install/libs
     --ndk-dir=path              path to the NDK installation. If not defined, this script attempts to find the path
                                 on its own. default=
 
@@ -113,62 +115,352 @@ echo_success() {
 
 ### --------- Initialize script constants  ---------
 
-YES="yes"
-NO="no"
+readonly YES="yes"
+readonly NO="no"
 
-ACTION_BUILD="build"
-ACTION_CLEAN="clean"
+readonly ACTION_BUILD="build"
+readonly ACTION_CLEAN="clean"
 
-LIB_TYPE_FILES="files"
-LIB_TYPE_ARCHIVE="archive"
-LIB_TYPE_SHARED="shared"
-LIB_TYPE_STATIC="static"
-LIB_TYPE_AUTO="auto"
+readonly LIB_TYPE_FILES="files"
+readonly LIB_TYPE_ARCHIVE="archive"
+readonly LIB_TYPE_SHARED="shared"
+readonly LIB_TYPE_STATIC="static"
+readonly LIB_TYPE_AUTO="auto"
 
-BITS_32="32"
-BITS_64="64"
-BITS_64ELSE32="64else32"
-BITS_NOCHANGE="nochange"
+readonly BITS_32="32"
+readonly BITS_64="64"
+readonly BITS_64ELSE32="64else32"
+readonly BITS_NOCHANGE="nochange"
 
 
 ### --------- Initialize script global variables  ---------
 
-flag_help=NO
-flag_version=NO
+working_dir=$(pwd)
+
+flag_help=$NO
+flag_version=$NO
 
 action=""
 
-arch="arm64"
+arch_list="arm64"
 api=23
-build_dir="build"
-icu_src_dir="icu/icu4c"
+build_dir="./build"
+icu_src_dir="./icu/icu4c"
+install_include_dir="./build/install/include"
+install_libs_dir="./build/install/libs"
 ndk_dir=""
 
-lib_data=YES
-lib_i18n=NO
-lib_io=NO
-lib_tu=NO
-lib_uc=YES
+lib_data=$YES
+lib_i18n=$NO
+lib_io=$NO
+lib_tu=$NO
+lib_uc=$YES
 
-library_type=LIB_TYPE_SHARED
-library_bits=BITS_NOCHANGE
+library_type=$LIB_TYPE_SHARED
+library_bits=$BITS_NOCHANGE
 library_suffix=""
 
-data_packaging=LIB_TYPE_AUTO
+data_packaging=$LIB_TYPE_AUTO
 
-require_PIC=YES
+require_PIC=$YES
 
-enable_draft=YES
-enable_legacy_converters=NO
-enable_samples=NO
-enable_tests=NO
+enable_draft=$YES
+enable_legacy_converters=$NO
+enable_samples=$NO
+enable_tests=$NO
 
 
 ### --------- Action logic  ---------
 
+prepare_icu_c_cxx_cpp() {
+    icu_configure_args="\
+        --enable-strict=no --enable-extras=no --enable-draft=$enable_draft \
+        --enable-samples=$enable_samples --enable-tests=$enable_tests \
+        --enable-dyload=no --enable-renaming=no"
+    __FLAGS="-Os -fno-short-wchar -fno-short-enums -ffunction-sections -fdata-sections -fvisibility=hidden \
+        -DU_USING_ICU_NAMESPACE=0 -DU_HAVE_NL_LANGINFO_CODESET=0 -DU_TIMEZONE=0 \
+        -DU_DISABLE_RENAMING=1"
+
+    case "$library_type" in
+    "$LIB_TYPE_SHARED" )
+        icu_configure_args+=" --enable-static=no --enable-shared=yes"
+        ;;
+    "$LIB_TYPE_STATIC" )
+        icu_configure_args+=" --enable-static=yes --enable-shared=no"
+        __FLAGS+=" -DU_STATIC_IMPLEMENTATION"
+        ;;
+    esac
+    if [ $data_packaging = $LIB_TYPE_SHARED ]; then
+        icu_configure_args+=" --with-data-packaging=library"
+    else
+        icu_configure_args+=" --with-data-packaging=$data_packaging"
+    fi
+    if [ $require_PIC = $YES ]; then
+        __FLAGS+=" -fPIC"
+    fi
+    if [ $enable_legacy_converters = $YES ]; then
+        __FLAGS+=" -DUCONFIG_NO_LEGACY_CONVERSION=0"
+    else
+        __FLAGS+=" -DUCONFIG_NO_LEGACY_CONVERSION=1"
+    fi
+
+    export CFLAGS="$__FLAGS"
+    export CXXFLAGS="-D__STDC_INT64__ $__FLAGS"
+    export CPPFLAGS="$CXXFLAGS"
+}
+
 build() {
-    echo "BUILD!!!!"
+    case $OSTYPE in
+    darwin* )
+        host_os_name="darwin"
+        host_os_arch="darwin-x86_64" # TODO: find correct host arch
+        host_os_build_type="MacOSX/GCC" # Identifier as wanted by the ICU configure script
+        ;;
+    linux* )
+        host_os_name="linux"
+        host_os_arch="linux-x86_64" # TODO: find correct host arch
+        host_os_build_type="Linux" # Identifier as wanted by the ICU configure script
+        ;;
+    * )
+        echo_error "${OSTYPE} is not supported, currently only support darwin* and linux*. Exiting"
+        exit 1
+        ;;
+    esac
+    echo "Host OS name:         $host_os_name"
+    echo "Host OS arch:         $host_os_arch"
+    echo "Host OS build type:   $host_os_build_type"
+    echo
+
+    mkdir -p "$build_dir"
+    if ! build_dir=$(realpath "$build_dir"); then
+        echo_error "Cannot find real path for given build dir '$build_dir'. Exiting"
+        return 1
+    fi
+    if ! icu_src_dir=$(realpath "$icu_src_dir"); then
+        echo_error "Cannot find real path for given ICU src dir '$icu_src_dir'. Exiting"
+        return 1
+    fi
+
+    prepare_icu_c_cxx_cpp
+
+    if ! build_host; then
+        echo_error "Building for host failed. Exiting"
+        exit 1
+    fi
+    if ! copy_host_include_files; then
+        exit 1
+    fi
+
+    IFS=',' read -ra tmp_arch <<< "$arch_list"
+    for tmp in "${tmp_arch[@]}"
+    do
+        if ! build_android "$tmp"; then
+            exit 1
+        fi
+    done
+    unset tmp
+    unset tmp_arch
+
     return 0
+}
+
+build_host() {
+    echo "Begin build process for host"
+    echo
+
+    host_build_dir="$build_dir/host"
+    mkdir -p "$host_build_dir"
+
+    if [ -d "$host_build_dir/icu_build" ]; then
+        echo "Host build already exists at '$host_build_dir', reusing."
+        echo
+        return 0
+    fi
+
+    cd "$host_build_dir" || return 1
+
+    export ICU_SOURCES=$icu_src_dir
+    # -pthread is needed, see https://github.com/protocolbuffers/protobuf/issues/4958
+    LDFLAGS="-std=gnu++11 -pthread"
+    # C, CXX and CPP flags have already been set
+
+    if [ $host_os_name = "linux" ]; then
+        LDFLAGS+=" -Wl,--gc-sections"
+    elif [ $host_os_name = "darwin" ]; then
+        # gcc on OSX does not support --gc-sections
+        LDFLAGS+=" -Wl,-dead_strip"
+    fi
+    export LDFLAGS
+
+    # Set --prefix option to disable install to the system,
+    # since we only need the libraries and header files
+    # shellcheck disable=SC2086
+    (exec "$ICU_SOURCES/source/runConfigureICU" $host_os_build_type \
+    --prefix="$host_build_dir/icu_build" $icu_configure_args)
+
+    if ! make -j16; then
+        cd "$working_dir" || return 1
+        return 1
+    fi
+
+    if ! make install; then
+        cd "$working_dir" || return 1
+        return 1
+    fi
+
+    if [ ! -d "$host_build_dir/icu_build/include/unicode" ]; then
+        cd "$working_dir" || return 1
+        return 1
+    fi
+
+    #if ! test; then
+    #    cd "$working_dir" || return 1
+    #    return 1
+    #fi
+
+    cd "$working_dir" || return 1
+    return 0
+}
+
+build_android() {
+    local arch=$1
+
+    echo "Begin build process for Android (arch=$arch)"
+    echo
+
+    if [ -z "$arch" ]; then
+        echo_error "No arch specified, exiting."
+        exit 1
+    fi
+    case $arch in
+    "arm" )
+        local abi="armeabi-v7a"
+        local target="armv7a-linux-androideabi"
+        ;;
+    "arm64" )
+        local abi="arm64-v8a"
+        local target="aarch64-linux-android"
+        ;;
+    "x86" )
+        local abi="x86"
+        local target="i686-linux-android"
+        ;;
+    "x86_64" )
+        local abi="x86_64"
+        local target="x86_64-linux-android"
+        ;;
+    * )
+        echo_error "Specified arch '$arch' is not supported by this build script. Exiting"
+        exit 1
+    esac
+    echo "Arch:     $arch"
+    echo "ABI:      $abi"
+    echo "Target:   $target"
+    echo
+
+    if [ "$ndk_dir" = "" ]; then
+        echo "Searching for NDK installation..."
+        if ! NDK=$(dirname "$(command -v ndk-build)"); then
+            echo_error "Failed to find an NDK installation. Either it is not installed or missing from \$PATH. Exiting"
+            exit 1
+        fi
+    else
+        if ! NDK=$(realpath "$ndk_dir"); then
+            echo_error "Failed find real path for given NDK dir '$ndk_dir'. Exiting"
+            exit 1
+        fi
+    fi
+    if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
+        echo_error "NDK installation at '$NDK' could not be verified for its validity. Exiting"
+        exit 1
+    fi
+    echo "Found and using NDK installation at '$NDK'"
+
+    local toolchain="$NDK/toolchains/llvm/prebuilt/$host_os_arch"
+    if [ ! -d "$toolchain" ]; then
+        echo_error "Expected toolchain '$toolchain', could not resolve path. Exiting"
+        exit 1
+    fi
+    echo "Selecting toolchain '$toolchain'"
+    echo
+
+    android_build_dir="$working_dir/build/android/$arch"
+    mkdir -p "$android_build_dir"
+    cd "$android_build_dir" || return 1
+
+    export TARGET=$target
+    export TOOLCHAIN=$toolchain
+    export API=$api
+    export AR=$TOOLCHAIN/bin/llvm-ar
+    export CC=$TOOLCHAIN/bin/$TARGET$API-clang
+    export AS=$CC
+    export CXX=$TOOLCHAIN/bin/$TARGET$API-clang++
+    export LD=$TOOLCHAIN/bin/ld
+
+    export ICU_SOURCES=$icu_src_dir
+    export ICU_CROSS_BUILD=$host_build_dir
+    export ANDROIDVER=$API
+    export NDK_STANDARD_ROOT=$TOOLCHAIN
+    export LDFLAGS="-lc -lstdc++ -Wl,--gc-sections,-rpath-link=$NDK_STANDARD_ROOT/sysroot/usr/lib/"
+    export PATH=$PATH:$NDK_STANDARD_ROOT/bin
+
+    # shellcheck disable=SC2086
+    (exec "$ICU_SOURCES/source/configure" --with-cross-build="$ICU_CROSS_BUILD" \
+    $icu_configure_args --host=$TARGET --prefix="$PWD/icu_build")
+
+    if ! make -j16; then
+        cd "$working_dir" || return 1
+        return 1
+    fi
+
+    cd "$working_dir" || return 1
+
+    copy_android_lib_files "$abi"
+
+    return 0
+}
+
+copy_host_include_files() {
+    local include_src_dir="$host_build_dir/icu_build/include"
+
+    mkdir -p "$install_include_dir"
+    if ! install_include_dir=$(realpath "$install_include_dir"); then
+        echo_error "Cannot find real path for given install include dir '$install_include_dir'. Exiting"
+        return 1
+    fi
+
+    echo "Copying include files"
+    echo " from src: $include_src_dir"
+    echo " to dst:   $install_include_dir"
+    if cp -r "$include_src_dir/"* "$install_include_dir"; then
+        echo "OK"
+        return 0
+    else
+        echo "FAILED"
+        return 1
+    fi
+}
+
+copy_android_lib_files() {
+    local lib_src_dir="$android_build_dir/lib"
+    local install_lib_dir="$install_libs_dir/$1"
+
+    mkdir -p "$install_lib_dir"
+    if ! install_lib_dir=$(realpath "$install_lib_dir"); then
+        echo_error "Cannot find real path for given install libs dir '$install_lib_dir'. Exiting"
+        return 1
+    fi
+
+    echo "Copying library files"
+    echo " from src: $lib_src_dir"
+    echo " to dst:   $install_lib_dir"
+    if cp -r "$lib_src_dir/"* "$install_lib_dir"; then
+        echo "OK"
+        return 0
+    else
+        echo "FAILED"
+        return 1
+    fi
 }
 
 clean() {
@@ -207,13 +499,13 @@ do
         fi
         case "$arg_name" in
         "help" )
-            flag_help=YES
+            flag_help=$YES
             ;;
         "version" )
-            flag_version=YES
+            flag_version=$YES
             ;;
         "arch" )
-            arch="$arg_value"
+            arch_list="$arg_value"
             ;;
         "api" )
             api="$arg_value"
@@ -223,6 +515,12 @@ do
             ;;
         "icu-src-dir" )
             icu_src_dir="$arg_value"
+            ;;
+        "install-include-dir" )
+            install_include_dir="$arg_value"
+            ;;
+        "install-libs-dir" )
+            install_libs_dir="$arg_value"
             ;;
         "ndk-dir" )
             ndk_dir="$arg_value"
@@ -284,28 +582,32 @@ done
 
 ### --------- Execute action  ---------
 
-if [ $flag_version = YES ]; then
+if [ $flag_version = $YES ]; then
     version
     exit 0
 fi
 
 case $action in
 "$ACTION_BUILD" )
-    if [ $flag_help = YES ]; then
+    if [ $flag_help = $YES ]; then
         usage_build
     else
-        build # Will exit the script with 0 or 1
+        if ! build ; then
+            echo_error "Build failed!"
+        else
+            echo_success "Build suceeded!"
+        fi
     fi
     ;;
 "$ACTION_CLEAN" )
-    if [ $flag_help = YES ]; then
+    if [ $flag_help = $YES ]; then
         usage_clean
     else
         clean # Will exit the script with 0 or 1
     fi
     ;;
 "" )
-    if [ $flag_help = YES ]; then
+    if [ $flag_help = $YES ]; then
         usage
     else
         echo_error "No action specified. Try --help to see how to use this script."
