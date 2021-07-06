@@ -89,6 +89,7 @@ The following sources have helped a lot to write this script:
 - https://unicode-org.github.io/icu/userguide/icu4c/build.html
 - https://unicode-org.github.io/icu/userguide/icu4c/packaging.html#reduce-the-number-of-libraries-used
 - https://unicode-org.github.io/icu-docs/apidoc/released/icu4c/uconfig_8h.html
+- https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html
 - https://developer.android.com/ndk/guides/other_build_systems
 - https://github.com/NanoMichael/cross_compile_icu4c_for_android
 

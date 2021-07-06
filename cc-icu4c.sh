@@ -18,6 +18,7 @@
 #  https://unicode-org.github.io/icu/userguide/icu4c/build.html
 #  https://unicode-org.github.io/icu/userguide/icu4c/packaging.html#reduce-the-number-of-libraries-used
 #  https://unicode-org.github.io/icu-docs/apidoc/released/icu4c/uconfig_8h.html
+#  https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html
 #  https://developer.android.com/ndk/guides/other_build_systems
 #  https://github.com/NanoMichael/cross_compile_icu4c_for_android
 
@@ -63,6 +64,8 @@ Options for build action:
     --library-bits=bits         specify the bits to use for the library (32, 64, 64else32, nochange). default=nochange
     --library-suffix=suffix     tag a suffix to the library names. default=
 
+    --data-filter-file=path     specify a filter JSOn file to reduce ICU data size. default=
+                                See https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html for more info.
     --data-packaging            specify how to package ICU data. Possible values:
         files       raw files (.res, etc)
         archive     build a single icudtXX.dat file
@@ -160,6 +163,7 @@ library_type=$LIB_TYPE_SHARED
 library_bits=$BITS_NOCHANGE
 library_suffix=""
 
+data_filter_file=""
 data_packaging=$LIB_TYPE_AUTO
 
 require_PIC=$YES
@@ -205,8 +209,14 @@ prepare_icu_c_cxx_cpp() {
     fi
 
     export CFLAGS="$__FLAGS"
-    export CXXFLAGS="-D__STDC_INT64__ $__FLAGS"
-    export CPPFLAGS="$CXXFLAGS"
+    export CXXFLAGS="$__FLAGS"
+    export CPPFLAGS="$__FLAGS"
+
+    if [ -n "$data_filter_file" ]; then
+        if ICU_DATA_FILTER_FILE=$(realpath "$data_filter_file"); then
+            export ICU_DATA_FILTER_FILE=$ICU_DATA_FILTER_FILE
+        fi
+    fi
 }
 
 build() {
@@ -281,7 +291,7 @@ build_host() {
 
     export ICU_SOURCES=$icu_src_dir
     # -pthread is needed, see https://github.com/protocolbuffers/protobuf/issues/4958
-    LDFLAGS="-std=gnu++11 -pthread"
+    LDFLAGS="-std=gnu++17 -pthread"
     # C, CXX and CPP flags have already been set
 
     if [ $host_os_name = "linux" ]; then
@@ -548,6 +558,9 @@ do
             ;;
         "library-suffix" )
             library_suffix="$arg_value"
+            ;;
+        "data-filter-file" )
+            data_filter_file="$arg_value"
             ;;
         "data-packaging" )
             data_packaging="$arg_value"
