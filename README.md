@@ -65,6 +65,8 @@ Options for build action:
     --library-bits=bits         specify the bits to use for the library (32, 64, 64else32, nochange). default=nochange
     --library-suffix=suffix     tag a suffix to the library names. default=
 
+    --data-filter-file=path     specify a filter JSON file to reduce ICU data size. default=
+                                See https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html for more info.
     --data-packaging            specify how to package ICU data. Possible values:
         files       raw files (.res, etc)
         archive     build a single icudtXX.dat file

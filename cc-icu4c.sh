@@ -52,11 +52,11 @@ Options for build action:
     --ndk-dir=path              path to the NDK installation. If not defined, this script attempts to find the path
                                 on its own. default=
 
-    --lib-data[=yes|no]         if the 'data' library should be built. default=yes
-    --lib-i18n[=yes|no]         if the 'i18n' library should be built. default=no
-    --lib-io[=yes|no]           if the 'io' library should be built. default=no
-    --lib-tu[=yes|no]           if the 'tu' library should be built. default=no
-    --lib-uc[=yes|no]           if the 'uc' library should be built. default=yes
+    --lib-data=yes|no           if the 'data' library should be built. default=yes
+    --lib-i18n=yes|no           if the 'i18n' library should be built. default=no
+    --lib-io=yes|no             if the 'io' library should be built. default=no
+    --lib-tu=yes|no             if the 'tu' library should be built. default=no
+    --lib-uc=yes|no             if the 'uc' library should be built. default=yes
 
     --library-type=value        specify the library type. Possible values:
         shared      shared library (.dll/.so/etc.) (default)
@@ -64,7 +64,7 @@ Options for build action:
     --library-bits=bits         specify the bits to use for the library (32, 64, 64else32, nochange). default=nochange
     --library-suffix=suffix     tag a suffix to the library names. default=
 
-    --data-filter-file=path     specify a filter JSOn file to reduce ICU data size. default=
+    --data-filter-file=path     specify a filter JSON file to reduce ICU data size. default=
                                 See https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html for more info.
     --data-packaging            specify how to package ICU data. Possible values:
         files       raw files (.res, etc)
@@ -180,7 +180,7 @@ prepare_icu_c_cxx_cpp() {
     icu_configure_args="\
         --enable-strict=no --enable-extras=no --enable-draft=$enable_draft \
         --enable-samples=$enable_samples --enable-tests=$enable_tests \
-        --enable-dyload=no --enable-renaming=no"
+        --enable-dyload=no --enable-renaming=no --enable-icuio=$lib_io"
     __FLAGS="-Os -fno-short-wchar -fno-short-enums -ffunction-sections -fdata-sections -fvisibility=hidden \
         -DU_USING_ICU_NAMESPACE=0 -DU_HAVE_NL_LANGINFO_CODESET=0 -DU_TIMEZONE=0 \
         -DU_DISABLE_RENAMING=1"
