@@ -77,11 +77,15 @@ Options for build action:
                                 Independent Code) should be set. default=yes
 
     --enable-FEATURE[=yes|no]   enable/disable a FEATURE (list below)
+    --enable-collation          turn on collation and collation-based string search. default=yes
     --enable-draft              enable draft APIs (and internal APIs). default=yes
+    --enable-formatting         turn on all formatting and calendar/timezone services. default=yes
     --enable-legacy-converters  enable legacy converters (everything apart from UTF, CESU-8, SCSU, BOCU-1, US-ASCII,
                                 and ISO-8859-1). default=no
+    --enable-regex              turn on the regular expression functionality. default=yes
     --enable-samples            build ICU samples. default=no
     --enable-tests              build ICU tests. default=no
+    --enable-transliteration    turn on script-to-script transliteration. default=no
 EOE
 }
 
@@ -135,6 +139,21 @@ readonly BITS_64="64"
 readonly BITS_64ELSE32="64else32"
 readonly BITS_NOCHANGE="nochange"
 
+bool_to_int() {
+    if [ "$1" = $YES ]; then
+        echo -e "1"
+    else
+        echo -e "0"
+    fi
+}
+bool_to_int_inv() {
+    if [ "$1" = $YES ]; then
+        echo -e "0"
+    else
+        echo -e "1"
+    fi
+}
+
 
 ### --------- Initialize script global variables  ---------
 
@@ -168,10 +187,14 @@ data_packaging=$LIB_TYPE_AUTO
 
 require_PIC=$YES
 
+enable_collation=$YES
 enable_draft=$YES
+enable_formatting=$YES
 enable_legacy_converters=$NO
+enable_regex=$YES
 enable_samples=$NO
 enable_tests=$NO
+enable_transliteration=$YES
 
 
 ### --------- Action logic  ---------
@@ -180,10 +203,15 @@ prepare_icu_c_cxx_cpp() {
     icu_configure_args="\
         --enable-strict=no --enable-extras=no --enable-draft=$enable_draft \
         --enable-samples=$enable_samples --enable-tests=$enable_tests \
-        --enable-dyload=no --enable-renaming=no --enable-icuio=$lib_io"
+        --enable-renaming=no --enable-icuio=$lib_io --enable-layoutex=no"
     __FLAGS="-Os -fno-short-wchar -fno-short-enums -ffunction-sections -fdata-sections -fvisibility=hidden \
         -DU_USING_ICU_NAMESPACE=0 -DU_HAVE_NL_LANGINFO_CODESET=0 -DU_TIMEZONE=0 \
-        -DU_DISABLE_RENAMING=1"
+        -DU_DISABLE_RENAMING=1 \
+        -DUCONFIG_NO_COLLATION=$(bool_to_int_inv $enable_collation) \
+        -DUCONFIG_NO_FORMATTING=$(bool_to_int_inv $enable_formatting) \
+        -DUCONFIG_NO_LEGACY_CONVERSION=$(bool_to_int_inv $enable_legacy_converters) \
+        -DUCONFIG_NO_REGULAR_EXPRESSIONS=$(bool_to_int_inv $enable_regex) \
+        -DUCONFIG_NO_TRANSLITERATION=$(bool_to_int_inv $enable_transliteration)"
 
     case "$library_type" in
     "$LIB_TYPE_SHARED" )
@@ -201,11 +229,6 @@ prepare_icu_c_cxx_cpp() {
     fi
     if [ $require_PIC = $YES ]; then
         __FLAGS+=" -fPIC"
-    fi
-    if [ $enable_legacy_converters = $YES ]; then
-        __FLAGS+=" -DUCONFIG_NO_LEGACY_CONVERSION=0"
-    else
-        __FLAGS+=" -DUCONFIG_NO_LEGACY_CONVERSION=1"
     fi
 
     export CFLAGS="$__FLAGS"
@@ -568,17 +591,29 @@ do
         "require-PIC" )
             require_PIC="$arg_value"
             ;;
+        "enable-collation" )
+            enable_collation="$arg_value"
+            ;;
         "enable-draft" )
             enable_draft="$arg_value"
             ;;
+        "enable-formatting" )
+            enable_formatting="$arg_value"
+            ;;
         "enable-legacy-converters" )
             enable_legacy_converters="$arg_value"
+            ;;
+        "enable-regex" )
+            enable_regex="$arg_value"
             ;;
         "enable-samples" )
             enable_samples="$arg_value"
             ;;
         "enable-tests" )
             enable_tests="$arg_value"
+            ;;
+        "enable-transliteration" )
+            enable_transliteration="$arg_value"
             ;;
         * )
             echo_warning "Ignoring unknown option '$arg_name'"
