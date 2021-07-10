@@ -86,7 +86,7 @@ Options for build action:
     --enable-regex              turn on the regular expression functionality. default=yes
     --enable-samples            build ICU samples. default=no
     --enable-tests              build ICU tests. default=no
-    --enable-transliteration    turn on script-to-script transliteration. default=no
+    --enable-transliteration    turn on script-to-script transliteration. default=yes
 ```
 
 ## Attribution
