@@ -52,11 +52,11 @@ Options for build action:
     --ndk-dir=path              path to the NDK installation. If not defined, this script attempts to find the path
                                 on its own. default=
 
-    --lib-data=yes|no           if the 'data' library should be built. default=yes
-    --lib-i18n=yes|no           if the 'i18n' library should be built. default=no
+    --lib-data=yes|no           if the 'data' library should be built. default=yes [NYI]
+    --lib-i18n=yes|no           if the 'i18n' library should be built. default=no [NYI]
     --lib-io=yes|no             if the 'io' library should be built. default=no
-    --lib-tu=yes|no             if the 'tu' library should be built. default=no
-    --lib-uc=yes|no             if the 'uc' library should be built. default=yes
+    --lib-tu=yes|no             if the 'tu' library should be built. default=no [NYI]
+    --lib-uc=yes|no             if the 'uc' library should be built. default=yes [NYI]
 
     --library-type=value        specify the library type. Possible values:
         shared      shared library (.dll/.so/etc.) (default)
@@ -203,7 +203,8 @@ prepare_icu_c_cxx_cpp() {
     icu_configure_args="\
         --enable-strict=no --enable-extras=no --enable-draft=$enable_draft \
         --enable-samples=$enable_samples --enable-tests=$enable_tests \
-        --enable-renaming=no --enable-icuio=$lib_io --enable-layoutex=no"
+        --enable-renaming=no --enable-icuio=$lib_io --enable-layoutex=no \
+        --with-library-bits=$library_bits --with-library-suffix=$library_suffix"
     __FLAGS="-Os -fno-short-wchar -fno-short-enums -ffunction-sections -fdata-sections -fvisibility=hidden \
         -DU_USING_ICU_NAMESPACE=0 -DU_HAVE_NL_LANGINFO_CODESET=0 -DU_TIMEZONE=0 \
         -DU_DISABLE_RENAMING=1 \

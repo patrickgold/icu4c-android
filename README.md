@@ -53,11 +53,11 @@ Options for build action:
     --ndk-dir=path              path to the NDK installation. If not defined, this script attempts to find the path
                                 on its own. default=
 
-    --lib-data[=yes|no]         if the 'data' library should be built. default=yes
-    --lib-i18n[=yes|no]         if the 'i18n' library should be built. default=no
-    --lib-io[=yes|no]           if the 'io' library should be built. default=no
-    --lib-tu[=yes|no]           if the 'tu' library should be built. default=no
-    --lib-uc[=yes|no]           if the 'uc' library should be built. default=yes
+    --lib-data=yes|no           if the 'data' library should be built. default=yes [NYI]
+    --lib-i18n=yes|no           if the 'i18n' library should be built. default=no [NYI]
+    --lib-io=yes|no             if the 'io' library should be built. default=no
+    --lib-tu=yes|no             if the 'tu' library should be built. default=no [NYI]
+    --lib-uc=yes|no             if the 'uc' library should be built. default=yes [NYI]
 
     --library-type=value        specify the library type. Possible values:
         shared      shared library (.dll/.so/etc.) (default)
@@ -78,11 +78,15 @@ Options for build action:
                                 Independent Code) should be set. default=yes
 
     --enable-FEATURE[=yes|no]   enable/disable a FEATURE (list below)
+    --enable-collation          turn on collation and collation-based string search. default=yes
     --enable-draft              enable draft APIs (and internal APIs). default=yes
+    --enable-formatting         turn on all formatting and calendar/timezone services. default=yes
     --enable-legacy-converters  enable legacy converters (everything apart from UTF, CESU-8, SCSU, BOCU-1, US-ASCII,
                                 and ISO-8859-1). default=no
+    --enable-regex              turn on the regular expression functionality. default=yes
     --enable-samples            build ICU samples. default=no
     --enable-tests              build ICU tests. default=no
+    --enable-transliteration    turn on script-to-script transliteration. default=no
 ```
 
 ## Attribution
