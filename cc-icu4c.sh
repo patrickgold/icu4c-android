@@ -521,6 +521,20 @@ copy_android_lib_files() {
     echo " to dst:   $install_lib_dir"
     if cp -r "$lib_src_dir/"* "$install_lib_dir"; then
         echo "OK"
+        if [ $data_packaging == $LIB_TYPE_ARCHIVE ]; then
+            local lib_src_dir="$android_build_dir/stubdata"
+
+            echo "Copying library files for stubdata"
+            echo " from src: $lib_src_dir"
+            echo " to dst:   $install_lib_dir"
+            if cp -r "$lib_src_dir/libicudata"* "$install_lib_dir"; then
+                echo "OK"
+                return 0
+            else
+                echo "FAILED"
+                return 1
+            fi
+        fi
         return 0
     else
         echo "FAILED"
