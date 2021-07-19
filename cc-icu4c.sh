@@ -48,7 +48,9 @@ Options for build action:
     --build-dir=path            path to the build output dir. default=./build
     --icu-src-dir=path          path to the ICU4C source dir. default=./icu/icu4c
     --install-include-dir=path  path to the output dir for the include files. default=./build/install/include
-    --install-libs-dir=path     path to the output dir for the library (and data) files. default=./build/install/libs
+    --install-libs-dir=path     path to the output dir for the library files. default=./build/install/libs
+    --install-data-dir=path     path to the output dir for the data files (only used when the --data-packaging option
+                                is either 'files' or 'archive'). default=./build/install/data
     --ndk-dir=path              path to the NDK installation. If not defined, this script attempts to find the path
                                 on its own. default=
 
@@ -170,6 +172,7 @@ build_dir="./build"
 icu_src_dir="./icu/icu4c"
 install_include_dir="./build/install/include"
 install_libs_dir="./build/install/libs"
+install_data_dir="./build/install/data"
 ndk_dir=""
 
 lib_data=$YES
@@ -282,6 +285,9 @@ build() {
         exit 1
     fi
     if ! copy_host_include_files; then
+        exit 1
+    fi
+    if ! copy_host_data_files; then
         exit 1
     fi
 
@@ -475,6 +481,31 @@ copy_host_include_files() {
     fi
 }
 
+copy_host_data_files() {
+    if ! [ $data_packaging == $LIB_TYPE_ARCHIVE ]; then
+        return 0
+    fi
+    local data_src_dir="$host_build_dir/data/out"
+    local install_dataa_dir="$install_data_dir"
+
+    mkdir -p "$install_dataa_dir"
+    if ! install_dataa_dir=$(realpath "$install_dataa_dir"); then
+        echo_error "Cannot find real path for given install data dir '$install_dataa_dir'. Exiting"
+        return 1
+    fi
+
+    echo "Copying data files"
+    echo " from src: $data_src_dir"
+    echo " to dst:   $install_dataa_dir"
+    if cp -r "$data_src_dir/"*".dat" "$install_dataa_dir"; then
+        echo "OK"
+        return 0
+    else
+        echo "FAILED"
+        return 1
+    fi
+}
+
 copy_android_lib_files() {
     local lib_src_dir="$android_build_dir/lib"
     local install_lib_dir="$install_libs_dir/$1"
@@ -555,6 +586,9 @@ do
             ;;
         "install-libs-dir" )
             install_libs_dir="$arg_value"
+            ;;
+        "install-data-dir" )
+            install_data_dir="$arg_value"
             ;;
         "ndk-dir" )
             ndk_dir="$arg_value"
