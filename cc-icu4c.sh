@@ -400,9 +400,13 @@ build_android() {
 
     if [ "$ndk_dir" = "" ]; then
         echo "Searching for NDK installation..."
-        if ! NDK=$(dirname "$(command -v ndk-build)"); then
-            echo_error "Failed to find an NDK installation. Either it is not installed or missing from \$PATH. Exiting"
-            exit 1
+        if [ -n "$NDK" ] && [ -d "$NDK" ]; then
+            :
+        else
+            if ! NDK=$(dirname "$(command -v ndk-build)"); then
+                echo_error "Failed to find an NDK installation. Either it is not installed or missing from \$PATH. Exiting"
+                exit 1
+            fi
         fi
     else
         if ! NDK=$(realpath "$ndk_dir"); then
@@ -410,7 +414,7 @@ build_android() {
             exit 1
         fi
     fi
-    if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
+    if [ -z "$NDK" ] || [ ! -d "$NDK" ] || [ ! -f "$NDK/ndk-build" ]; then
         echo_error "NDK installation at '$NDK' could not be verified for its validity. Exiting"
         exit 1
     fi
