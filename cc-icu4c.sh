@@ -235,8 +235,6 @@ prepare_icu_c_cxx_cpp() {
         __FLAGS+=" -fPIC"
     fi
 
-    export CFLAGS="$__FLAGS"
-    export CXXFLAGS="$__FLAGS"
     export CPPFLAGS="$__FLAGS"
 
     if [ -n "$data_filter_file" ]; then
@@ -319,9 +317,9 @@ build_host() {
 
     cd "$host_build_dir" || return 1
 
-    export ICU_SOURCES=$icu_src_dir
+    export ICU_SOURCES="$icu_src_dir"
     # -pthread is needed, see https://github.com/protocolbuffers/protobuf/issues/4958
-    LDFLAGS="-std=gnu++17 -pthread"
+    LDFLAGS="-pthread"
     # C, CXX and CPP flags have already been set
 
     if [ $host_os_name = "linux" ]; then
@@ -330,7 +328,7 @@ build_host() {
         # gcc on OSX does not support --gc-sections
         LDFLAGS+=" -Wl,-dead_strip"
     fi
-    export LDFLAGS
+    export LDFLAGS="$LDFLAGS"
 
     # Set --prefix option to disable install to the system,
     # since we only need the libraries and header files
@@ -490,18 +488,18 @@ copy_host_data_files() {
         return 0
     fi
     local data_src_dir="$host_build_dir/data/out"
-    local install_dataa_dir="$install_data_dir"
+    local install_data_dir="$install_data_dir"
 
-    mkdir -p "$install_dataa_dir"
-    if ! install_dataa_dir=$(realpath "$install_dataa_dir"); then
-        echo_error "Cannot find real path for given install data dir '$install_dataa_dir'. Exiting"
+    mkdir -p "$install_data_dir"
+    if ! install_data_dir=$(realpath "$install_data_dir"); then
+        echo_error "Cannot find real path for given install data dir '$install_data_dir'. Exiting"
         return 1
     fi
 
     echo "Copying data files"
     echo " from src: $data_src_dir"
-    echo " to dst:   $install_dataa_dir"
-    if cp -r "$data_src_dir/"*".dat" "$install_dataa_dir"; then
+    echo " to dst:   $install_data_dir"
+    if cp -r "$data_src_dir/"*".dat" "$install_data_dir"; then
         echo "OK"
         return 0
     else
