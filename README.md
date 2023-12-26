@@ -1,3 +1,7 @@
+**This project is out-dated and not maintained anymore, please refer to [florisboard/icu4c](https://github.com/florisboard/icu4c), where the cross-compiling has been implemented mostly using cmake.**
+
+---
+
 # icu4c-android
 
 WIP project for cross-compiling of ICU4C for Android NDK projects.
